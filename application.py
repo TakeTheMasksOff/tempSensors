@@ -28,10 +28,11 @@ import requests
 import time
 
 
-link_AHU1_AHU2_intake_supply = 'http://172.19.6.231/kbr/?pt=31&cmd=list'
+link_AHU1_AHU2_intake_supply_AHU1_mid = 'http://172.19.6.231/kbr/?pt=31&cmd=list'
 link_AHU4_AHU3_intake_supply = 'http://172.19.6.231/kbr/?pt=30&cmd=list'
 link_AHU2_3_4_mid = 'http://172.19.6.231/kbr/?pt=32&cmd=list'
 
+AHU1_mid = "aaabe9191302"
 AHU2_mid = "aaeb5c1a1302"
 AHU3_mid = "89ab10301401"
 AHU4_mid = "aa45ba1a1302"
@@ -118,11 +119,11 @@ def get_raw_devices_data(link, delay, time_out):
 if __name__ == '__main__':
     # socketio.run(app)
 
-    raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply, 0, 5)
-    print("link_AHU1_AHU2_intake_supply=", raw_data)
+    raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply_AHU1_mid, 0, 5)
+    print("link_AHU1_AHU2_intake_supply_AHU1_mid=", raw_data)
     if raw_data == None:
-        raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply, 0, 5)
-        print("second call link_AHU1_AHU2_intake_supply=",raw_data)
+        raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply_AHU1_mid, 0, 5)
+        print("second call link_AHU1_AHU2_intake_supply_AHU1_mid=",raw_data)
     # parsing
 
     raw_data = get_raw_devices_data(link_AHU4_AHU3_intake_supply, 5, 5)
