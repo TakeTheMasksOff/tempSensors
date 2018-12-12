@@ -122,8 +122,8 @@ body{
 }
 
 .round-border{
-    width:6vw;
-    height: 6vw;
+    width:7vw;
+    height: 7vw;
     border-radius: 50%;
     border: 3px solid black;
 }
@@ -133,5 +133,12 @@ body{
 }
 
 .outside{
-    margin-top: 5vh;
+    margin-top: 3vh;
+    margin-bottom: 2vh;
+}
+
+.last-update{
+    color: rgb(77, 74, 74);
+    font-size: 1.5vw;
+    padding: 1vw;
 }
