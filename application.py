@@ -1,11 +1,13 @@
+from flask import Flask, render_template
 from flask_socketio import SocketIO, emit
-from flask import Flask, render_template, url_for, copy_current_request_context
 from time import sleep
 import threading
 import requests
 import datetime
 import json
 import sqlite3
+
+__author__ = 'TakeTheMasksOff'
 
 link_AHU1_AHU2_intake_supply_AHU1_mid = 'http://172.19.6.231/kbr/?pt=31&cmd=list'
 link_AHU4_AHU3_intake_supply = 'http://172.19.6.231/kbr/?pt=30&cmd=list'
@@ -32,37 +34,41 @@ map_obj = {
 
 temps_obj = {
     "device_outside": 1,
-    "AHU4_mid": 1,
-    "AHU4_supply": 1,
-    "AHU4_intake": 1,
-    "AHU3_mid": 1,
-    "AHU3_supply": 1,
-    "AHU3_intake": 1,
+    "AHU1_mid": 1,
+    "AHU1_supply": 1,
+    "AHU1_intake": 1,
     "AHU2_mid": 1,
     "AHU2_supply": 1,
     "AHU2_intake": 1,
-    "AHU1_mid": 1,
-    "AHU1_supply": 1,
-    "AHU1_intake": 1
+    "AHU3_mid": 1,
+    "AHU3_supply": 1,
+    "AHU3_intake": 1,
+    "AHU4_mid": 1,
+    "AHU4_supply": 1,
+    "AHU4_intake": 1
 }
 
 
-__author__ = 'TakeTheMasksOff'
+thread_daemon = None
+thread_lock = threading.Lock()
 
+# Set this variable to "threading", "eventlet" or "gevent" to test the
+# different async modes, or leave it set to None for the application to choose
+# the best option gased on installed packages.
+async_mode = None
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
-app.config['DEBUG'] = True
+# app.config['DEBUG'] = True
 
 # turn the flask app into a socketio app
-socketio = SocketIO(app)
+socketio = SocketIO(app, async_mode=async_mode)
 client_count = 0
 
 # @app.before_first_request
 # def start_requesting_sensors():
-    
+
 #     print("client_count=", client_count)
 #     print("############################# STARTING SCHEDULE  #############################")
-    
 
 
 @app.route('/')
@@ -78,11 +84,13 @@ def test_connect():
     global client_count
     client_count += 1
     print('<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<Total client count = ', client_count)
+    print("+++++++++++++++++++++++++++++++++++++ active thread count=",
+          threading.active_count(), "+++++++++++++++++++++++++++++++++++++")
     print("current thread = ", threading.current_thread())
     print("thread identifier = ", threading.get_ident())
-    print("thread identifier = ", threading.main_thread())
-    print("enumerate = ", threading.enumerate())
-    
+    print("MAIN thread identifier = ", threading.main_thread())
+    print("-------------------------------------------- ENUMERATE=",
+          threading.enumerate(), "--------------------------------------------")
 
 
 @socketio.on('disconnect', namespace='/test')
@@ -92,26 +100,37 @@ def test_disconnect():
     global client_count
     client_count -= 1
     print('>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Total client count = ', client_count)
+    print("+++++++++++++++++++++++++++++++++++++ active thread count=",
+          threading.active_count(), "+++++++++++++++++++++++++++++++++++++")
+    print("current thread = ", threading.current_thread())
+    print("thread identifier = ", threading.get_ident())
+    print("MAIN thread identifier = ", threading.main_thread())
+    print("-------------------------------------------- ENUMERATE=",
+          threading.enumerate(), "--------------------------------------------")
 
 
 def my_schedule():
     while True:
-        print("\n===========================")
+        print("\n===================================================================================================")
         print("iteration start time", datetime.datetime.now().strftime("%c"))
         init_transfer_obj()
         js_string = collect_data()
+        flush_in_db()
         print("json obj to send=", js_string)
-        if (client_count>0):
-            socketio.emit('sensors', js_string, namespace='/test')
-        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iteration end time", datetime.datetime.now().strftime("%c"))
+        # if (client_count>0):
+        socketio.emit('sensors', js_string, namespace='/test')
+        print("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~iteration end time: {}~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~".format(
+              datetime.datetime.now().strftime("%c")))
         print('Total client count = ', client_count)
         print("===================================================================================================\n")
-        print("++++++++++++++++++++++++++++++++++++++++++++ active thread count=", threading.active_count(), "++++++++++++++++++++++++++++++++++++++")
-        print("-------------------------------------------- ENUMERATE=", threading.enumerate(), "--------------------------------------------")
+        print("+++++++++++++++++++++++++++++++++++++ active thread count=",
+              threading.active_count(), "+++++++++++++++++++++++++++++++++++++")
         print("current thread = ", threading.current_thread())
         print("thread identifier = ", threading.get_ident())
         print("MAIN thread identifier = ", threading.main_thread())
-        
+        print("-------------------------------------------- ENUMERATE=",
+              threading.enumerate(), "--------------------------------------------")
+
         sleep(30)
         # threading.Timer(30, my_schedule).start()
 
@@ -123,10 +142,12 @@ def init_transfer_obj():
 
 
 def collect_data():
-    raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply_AHU1_mid, 0, 5)
+    raw_data = get_raw_devices_data(
+        link_AHU1_AHU2_intake_supply_AHU1_mid, 0, 5)
     print("link_AHU1_AHU2_intake_supply_AHU1_mid=", raw_data)
     if raw_data == None:
-        raw_data = get_raw_devices_data(link_AHU1_AHU2_intake_supply_AHU1_mid, 2, 5)
+        raw_data = get_raw_devices_data(
+            link_AHU1_AHU2_intake_supply_AHU1_mid, 2, 5)
         print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!  second call link_AHU1_AHU2_intake_supply_AHU1_mid=", raw_data)
     parse_from_device(raw_data)
 
@@ -197,51 +218,46 @@ def parse_from_device(raw_data):
                     temps_obj[key] = sensor[1]
 
 
-def my_schedule2():
-    while True:
-        print("\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-        print("DAEMON. current thread = ", threading.current_thread())
-        print("DAEMON. thread identifier = ", threading.get_ident())
-        print("DAEMON. main_thread = ", threading.main_thread())
-        print("DAEMON. enumerate = ", threading.enumerate())
-        print("\n$$$$$$$$$$$$$$$$$$$$$$$$$$$$")
-        sleep(5)
+def flush_in_db():
+    conn = sqlite3.connect('TemperatureSensors.db',
+                           detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
+    c = conn.cursor()
+    columns = ', '.join(temps_obj.keys())
+    placeholders = ':'+', :'.join(temps_obj.keys())
+    query = f'INSERT INTO temperaturesensors ({columns}) VALUES ({placeholders})'
+    print(query)
+    c.execute(query, temps_obj)
+    conn.commit()
+    conn.close()
 
 
 if __name__ == '__main__':
-    # print("++++++++++++++++++++++++++++++++++++++++++++ active thread count=", threading.active_count(), "++++++++++++++++++++++++++++++++++++++")
-    # print("++++++++++++++++++++++++++++++++++++++++++++ ENUMERATE=", threading.enumerate(), "++++++++++++++++++++++++++++++++++++++")
-    # print("current thread = ", threading.current_thread())
-    # print("thread identifier = ", threading.get_ident())
-    # print("main thread = ", threading.main_thread())
-    # print("\n              STARTING my_schedule\n")
-    # # d = threading.Thread(name='daemon', target=my_schedule)
-    # # d.setDaemon(True)
-    # # d.start()
-    # socketio.run(app, host="0.0.0.0")
-
-    conn = sqlite3.connect('TemperatureSensors.db', detect_types=sqlite3.PARSE_DECLTYPES|sqlite3.PARSE_COLNAMES)
+    conn = sqlite3.connect('TemperatureSensors.db',
+                           detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES)
     c = conn.cursor()
 
-    # # Create table
-    c.execute(
-        '''CREATE TABLE IF NOT EXISTS temperaturesensors(id INTEGER, created_at TIMESTAMP PRIMARY KEY(id))''')
+    # Create table
+    c.execute("CREATE TABLE IF NOT EXISTS temperaturesensors (id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, created_at TEXT DEFAULT (datetime('now','localtime')) NOT NULL)")
     column_names = temps_obj.keys()
+    print(column_names)
     for column_name in column_names:
         try:
-            c.execute(''''ALTER TABLE temperaturesensors ADD COLUMN ? INTEGER''',column_name)
+            c.execute(
+                f"ALTER TABLE temperaturesensors ADD COLUMN {column_name} INTEGER")
         except:
             pass
 
-    # # Insert a row of data
-    # c.execute("INSERT INTO stocks VALUES ('2006-01-05','BUY','RHAT',100,35.14)")
+    with thread_lock:
+        if thread_daemon is None:
+            thread_daemon = threading.Thread(
+                name='Sensors_daemon', target=my_schedule)
+            thread_daemon.setDaemon(True)
+            thread_daemon.start()
+            # thread_daemon = socketio.start_background_task(my_schedule)
+    socketio.run(app, host="0.0.0.0")
 
-    # c.execute("SELECT * FROM stocks")
+    # c.execute("pragma table_info(temperaturesensors)")
     # print(c.fetchall())
-
-    # # Save (commit) the changes
-    # conn.commit()
-
-    # # We can also close the connection if we are done with it.
-    # # Just be sure any changes have been committed or they will be lost.
+    c.execute("SELECT * FROM temperaturesensors")
+    print(c.fetchall())
     conn.close()
